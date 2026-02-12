@@ -1,0 +1,127 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #1a1a2e;
+  color: #fff;
+  height: 100vh;
+}
+
+/* ==================== Ana Ekran ==================== */
+#home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+#home.hidden {
+  display: none;
+}
+
+h1 {
+  margin-bottom: 8px;
+  font-size: 28px;
+}
+
+.subtitle {
+  color: #888;
+  margin-bottom: 40px;
+  font-size: 14px;
+}
+
+/* ==================== Tool Kartlari ==================== */
+.tools {
+  display: grid;
+  grid-template-columns: repeat(3, 160px);
+  gap: 20px;
+}
+
+.tool-card {
+  background: #16213e;
+  border: 2px solid #0f3460;
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tool-card:hover {
+  border-color: #e94560;
+  transform: translateY(-2px);
+}
+
+.tool-card .icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.tool-card .name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ==================== Tool Gorunumu ==================== */
+#tool-view {
+  display: none;
+  height: 100vh;
+  flex-direction: column;
+}
+
+#tool-view.active {
+  display: flex;
+}
+
+/* ==================== Toolbar ==================== */
+.toolbar {
+  background: #0f3460;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar .back-btn {
+  background: #e94560;
+  color: #fff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toolbar .back-btn:hover {
+  background: #c73652;
+}
+
+.toolbar .tool-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.toolbar .domain-info {
+  font-size: 12px;
+  color: #888;
+  margin-left: auto;
+}
+
+/* ==================== Browser Container ==================== */
+#browser-container {
+  flex: 1;
+  position: relative;
+}
+
+#browser-container webview {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}

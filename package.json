@@ -1,0 +1,19 @@
+{
+  "name": "poc-deneme",
+  "version": "1.0.0",
+  "main": "index.html",
+  "node-remote": "file://*",
+  "chromium-args": "--enable-features=nw2 --enable-logging",
+  "window": {
+    "title": "Virtual Tool Lab",
+    "width": 1200,
+    "height": 800,
+    "position": "center"
+  },
+  "scripts": {
+    "start": "nw ."
+  },
+  "devDependencies": {
+    "nw": "^0.92.0"
+  }
+}

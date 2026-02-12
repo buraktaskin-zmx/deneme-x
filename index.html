@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Virtual Tool Lab</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Ana Ekran -->
+  <div id="home">
+    <h1>Virtual Tool Lab</h1>
+    <p class="subtitle">Bir arac secin</p>
+    <div class="tools"></div>
+  </div>
+
+  <!-- Tool Gorunumu -->
+  <div id="tool-view">
+    <div class="toolbar">
+      <button class="back-btn" id="back-btn">← Geri</button>
+      <span class="tool-title" id="toolbar-title"></span>
+      <span class="domain-info" id="toolbar-domain"></span>
+    </div>
+    <div id="browser-container"></div>
+    <div id="debug-panel" style="background:#000;color:#0f0;font-family:monospace;font-size:11px;padding:8px;height:120px;overflow-y:auto;"></div>
+
+  </div>
+
+  
+<!-- JS Modulleri (siralama onemli) -->
+  <script src="js/tools-config.js"></script>
+  <script src="js/credential-manager.js"></script>
+  <script src="js/login-injector.js"></script>
+  <script src="js/tool-launcher.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
