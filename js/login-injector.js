@@ -1,168 +1,232 @@
 /**
- * Login Injector
+ * Login Injector - Tool sayfalarına otomatik login bilgisi enjekte eder
+ * Google SSO desteği eklenmiştir
  */
-var LoginInjector = (function() {
+(function() {
   'use strict';
 
-  function log(msg) {
-    ToolLauncher.log('INJECTOR: ' + msg);
-  }
-
-  function waitAndExecute(wv, checkCode, actionCode, description, interval, maxAttempts) {
-    var attempts = 0;
-    var timer = setInterval(function() {
-      attempts++;
-      if (attempts > maxAttempts) {
-        clearInterval(timer);
-        log(description + ' - TIMEOUT');
+  const LoginInjector = {
+    /**
+     * Mevcut tool için login bilgilerini al ve otomatik doldur
+     * @param {string} toolKey - Tool anahtarı
+     * @param {object} webview - NW.js webview elementi
+     */
+    inject: function(toolKey, webview) {
+      const credentials = CredentialManager.getCredential(toolKey);
+      if (!credentials) {
+        console.log('No credentials found for:', toolKey);
         return;
       }
-      wv.executeScript({ code: checkCode }, function(res) {
-        if (res && res[0] === true) {
-          clearInterval(timer);
-          log(description + ' - BULUNDU, calistiriliyor...');
-          wv.executeScript({ code: actionCode }, function(result) {
-            log(description + ' - SONUC: ' + (result ? result[0] : 'bos'));
-          });
+
+      const toolConfig = TOOLS_CONFIG[toolKey];
+      if (!toolConfig || !toolConfig.loginSelectors) {
+        console.log('No login selectors configured for:', toolKey);
+        return;
+      }
+
+      // Webview yüklendiğinde inject et
+      webview.addEventListener('loadstop', function() {
+        const currentUrl = webview.src || '';
+        
+        // Google OAuth sayfasında mıyız?
+        if (currentUrl.includes('accounts.google.com')) {
+          LoginInjector.handleGoogleLogin(webview, credentials);
+          return;
         }
+
+        // Normal login sayfası işlemleri
+        LoginInjector.handleNormalLogin(webview, toolConfig, credentials);
       });
-    }, interval);
-  }
+    },
 
-  function injectChatGPT(wv, cred) {
-    var loginClicked = false;
-
-    wv.addEventListener('loadstop', function() {
-      var currentUrl = wv.src || '';
-      log('URL: ' + currentUrl);
-
-      // Adim 1: "Log in" butonuna tikla (sadece bir kez)
-      if (currentUrl.includes('chatgpt.com') && !currentUrl.includes('auth') && !loginClicked) {
-        loginClicked = true;
-        waitAndExecute(wv,
-          // Check: Log in butonu var mi?
-          `(function() {
-            var all = document.querySelectorAll('button');
-            for (var i = 0; i < all.length; i++) {
-              if (all[i].textContent.trim() === 'Log in') return true;
-            }
-            return false;
-          })();`,
-          // Action: Log in butonuna tikla
-          `(function() {
-            var all = document.querySelectorAll('button');
-            for (var i = 0; i < all.length; i++) {
-              if (all[i].textContent.trim() === 'Log in') {
-                all[i].click();
-                return 'CLICKED';
-              }
-            }
-            return 'NOT FOUND';
-          })();`,
-          'ADIM 1: Log in butonu', 1000, 10
-        );
-
-        // Adim 2: Modal acilinca email doldur
-        setTimeout(function() {
-          waitAndExecute(wv,
-            // Check: Email input var mi?
-            `(function() {
-              var input = document.querySelector('input[type="email"], input[name="email"], input[inputmode="email"]');
-              return input !== null;
-            })();`,
-            // Action: Email doldur
-            `(function() {
-              var input = document.querySelector('input[type="email"], input[name="email"], input[inputmode="email"]');
-              if (!input) return 'INPUT YOK';
-              input.focus();
-              input.value = '` + cred.email + `';
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-              return 'EMAIL YAZILDI';
-            })();`,
-            'ADIM 2: Email input', 1000, 15
-          );
-        }, 3000);
-
-        // Adim 3: Continue butonuna tikla
-        setTimeout(function() {
-          waitAndExecute(wv,
-            // Check: Email dolu mu?
-            `(function() {
-              var input = document.querySelector('input[type="email"], input[name="email"], input[inputmode="email"]');
-              return input && input.value.length > 3;
-            })();`,
-            // Action: Continue/Submit tikla
-            `(function() {
-              var btn = document.querySelector('button[type="submit"]');
-              if (!btn) {
-                var all = document.querySelectorAll('button');
-                for (var i = 0; i < all.length; i++) {
-                  var text = all[i].textContent.trim().toLowerCase();
-                  if (text === 'continue' || text === 'devam') {
-                    all[i].click();
-                    return 'CONTINUE CLICKED';
-                  }
+    /**
+     * Google OAuth login işlemini yönet
+     * @param {object} webview - Webview elementi
+     * @param {object} credentials - Kullanıcı bilgileri
+     */
+    handleGoogleLogin: function(webview, credentials) {
+      const currentUrl = webview.src || '';
+      
+      // Email giriş sayfası
+      if (currentUrl.includes('identifier') || currentUrl.includes('ServiceLogin')) {
+        const emailScript = `
+          (function() {
+            // Email input'u bul ve doldur
+            const emailInput = document.querySelector('input[type="email"]') || 
+                              document.querySelector('#identifierId') ||
+                              document.querySelector('input[name="identifier"]');
+            
+            if (emailInput) {
+              emailInput.value = '${credentials.username}';
+              emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+              emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+              
+              // Next butonuna tıkla
+              setTimeout(function() {
+                const nextBtn = document.querySelector('#identifierNext') ||
+                               document.querySelector('[data-primary-action-label]') ||
+                               document.querySelector('button[type="submit"]') ||
+                               document.querySelector('.VfPpkd-LgbsSe-OWXEXe-k8QpJ');
+                
+                if (nextBtn) {
+                  nextBtn.click();
                 }
-                return 'CONTINUE BULUNAMADI';
-              }
-              btn.click();
-              return 'SUBMIT CLICKED';
-            })();`,
-            'ADIM 3: Continue butonu', 1000, 15
-          );
-        }, 6000);
+              }, 500);
+            }
+          })();
+        `;
+        
+        setTimeout(function() {
+          webview.executeScript({ code: emailScript });
+        }, 1000);
       }
-
-      // Adim 4: Auth sayfasinda password doldur
-      if (currentUrl.includes('auth.openai.com') || currentUrl.includes('auth0.openai.com')) {
-        waitAndExecute(wv,
-          // Check: Password input var mi?
-          `(function() {
-            var input = document.querySelector('input[type="password"]');
-            return input !== null;
-          })();`,
-          // Action: Password doldur ve submit
-          `(function() {
-            var input = document.querySelector('input[type="password"]');
-            if (!input) return 'PASSWORD INPUT YOK';
-            input.focus();
-            input.value = '` + cred.password + `';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            setTimeout(function() {
-              var btn = document.querySelector('button[type="submit"]');
-              if (btn) btn.click();
-            }, 800);
-            return 'PASSWORD YAZILDI';
-          })();`,
-          'ADIM 4: Password input', 1000, 15
-        );
+      
+      // Şifre giriş sayfası
+      if (currentUrl.includes('challenge') || currentUrl.includes('pwd')) {
+        const passwordScript = `
+          (function() {
+            // Şifre input'u bul ve doldur
+            const passwordInput = document.querySelector('input[type="password"]') ||
+                                 document.querySelector('input[name="password"]') ||
+                                 document.querySelector('#password input[type="password"]');
+            
+            if (passwordInput) {
+              passwordInput.value = '${credentials.password}';
+              passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+              passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
+              
+              // Next/Login butonuna tıkla
+              setTimeout(function() {
+                const submitBtn = document.querySelector('#passwordNext') ||
+                                 document.querySelector('button[type="submit"]') ||
+                                 document.querySelector('.VfPpkd-LgbsSe-OWXEXe-k8QpJ');
+                
+                if (submitBtn) {
+                  submitBtn.click();
+                }
+              }, 500);
+            }
+          })();
+        `;
+        
+        setTimeout(function() {
+          webview.executeScript({ code: passwordScript });
+        }, 1000);
       }
-    });
-  }
+    },
 
-  function inject(toolKey, webview) {
-    log('inject cagirildi: ' + toolKey);
-    try {
-      var cred = CredentialManager.getFor(toolKey);
-      if (!cred) {
-        log('HATA: Credential NULL');
+    /**
+     * Normal login ve Google SSO butonu tıklama
+     * @param {object} webview - Webview elementi
+     * @param {object} toolConfig - Tool konfigürasyonu
+     * @param {object} credentials - Kullanıcı bilgileri
+     */
+    handleNormalLogin: function(webview, toolConfig, credentials) {
+      const selectors = toolConfig.loginSelectors;
+      
+      // Google SSO butonu varsa önce onu dene
+      if (selectors.googleSsoButton) {
+        const googleSsoScript = `
+          (function() {
+            // Google ile giriş butonunu bul
+            const googleBtn = document.querySelector('${selectors.googleSsoButton}') ||
+                             document.querySelector('button[data-provider="google"]') ||
+                             document.querySelector('[data-action="google"]') ||
+                             document.querySelector('button:contains("Google")') ||
+                             Array.from(document.querySelectorAll('button')).find(btn => 
+                               btn.textContent.toLowerCase().includes('google') ||
+                               btn.textContent.toLowerCase().includes('continue with google')
+                             ) ||
+                             Array.from(document.querySelectorAll('a')).find(a => 
+                               a.textContent.toLowerCase().includes('google') ||
+                               a.textContent.toLowerCase().includes('continue with google')
+                             );
+            
+            if (googleBtn) {
+              console.log('Google SSO button found, clicking...');
+              googleBtn.click();
+              return true;
+            }
+            
+            // ChatGPT için özel selector'lar
+            const chatGptGoogleBtn = document.querySelector('[data-testid="login-with-google"]') ||
+                                    document.querySelector('.social-btn-google') ||
+                                    document.querySelector('[aria-label*="Google"]') ||
+                                    document.querySelector('[class*="google"]');
+            
+            if (chatGptGoogleBtn) {
+              console.log('ChatGPT Google button found, clicking...');
+              chatGptGoogleBtn.click();
+              return true;
+            }
+            
+            return false;
+          })();
+        `;
+        
+        setTimeout(function() {
+          webview.executeScript({ code: googleSsoScript });
+        }, 1500);
+        
         return;
       }
-      log('Credential yuklendi - email: ' + cred.email.substring(0, 3) + '***');
-
-      switch(toolKey) {
-        case 'chatgpt':
-          injectChatGPT(webview, cred);
-          break;
-        default:
-          log('Injector tanimlanmamis: ' + toolKey);
+      
+      // Normal login işlemi
+      if (selectors.username && selectors.password && selectors.submit) {
+        const loginScript = `
+          (function() {
+            const usernameEl = document.querySelector('${selectors.username}');
+            const passwordEl = document.querySelector('${selectors.password}');
+            const submitEl = document.querySelector('${selectors.submit}');
+            
+            if (usernameEl && passwordEl) {
+              usernameEl.value = '${credentials.username}';
+              usernameEl.dispatchEvent(new Event('input', { bubbles: true }));
+              
+              passwordEl.value = '${credentials.password}';
+              passwordEl.dispatchEvent(new Event('input', { bubbles: true }));
+              
+              if (submitEl) {
+                setTimeout(function() {
+                  submitEl.click();
+                }, 300);
+              }
+            }
+          })();
+        `;
+        
+        setTimeout(function() {
+          webview.executeScript({ code: loginScript });
+        }, 1000);
       }
-    } catch(err) {
-      log('CATCH HATA: ' + err.message);
-    }
-  }
+    },
 
-  return { inject: inject };
+    /**
+     * ChatGPT için özel login akışı
+     * @param {object} webview - Webview elementi
+     * @param {object} credentials - Kullanıcı bilgileri
+     */
+    handleChatGPTLogin: function(webview, credentials) {
+      const loginPageScript = `
+        (function() {
+          // Login butonuna tıkla
+          const loginBtn = document.querySelector('[data-testid="login-button"]') ||
+                          document.querySelector('button:contains("Log in")') ||
+                          Array.from(document.querySelectorAll('button')).find(btn => 
+                            btn.textContent.toLowerCase().includes('log in')
+                          );
+          
+          if (loginBtn) {
+            loginBtn.click();
+          }
+        })();
+      `;
+      
+      webview.executeScript({ code: loginPageScript });
+    }
+  };
+
+  // Global scope'a ekle
+  window.LoginInjector = LoginInjector;
+
 })();

@@ -2,6 +2,8 @@
  * Ana uygulama dosyasi
  * Tool kartlarini olusturur ve event'leri baglar
  */
+
+
 (function() {
   'use strict';
 
